@@ -1,19 +1,20 @@
 import Foundation
+import os
 
-/// A rebuilt face: clean tones and features from GFPGAN (512 px) plus fine texture (pores, lashes,
-/// lip lines) taken from GPEN-1024 as a high-pass layer. Both live in the same aligned crop.
+/// A rebuilt face: clean tones and features from GFPGAN plus fine texture (pores, lashes,
+/// lip lines) taken from GPEN as a high-pass layer. Both live in the same 512 aligned crop.
 struct RestoredFace {
-    let imageToCrop: Affine   // image -> 1024 crop space
+    let imageToCrop: Affine   // image -> crop space
     let clean: [UInt8]        // 512*512 interleaved RGB (GFPGAN)
-    let detail: [Int8]        // 1024*1024 planar RGB high-pass (GPEN)
+    let detail: [Int8]        // 512*512 planar RGB high-pass (GPEN)
 }
 
 /// Face restoration in the style of Remini: GFPGAN gives natural, flattering eyes and skin tone;
 /// GPEN-1024 adds real skin texture on top so the face doesn't look plastic.
 final class FaceRestorer {
-    static let cropSize = 1024
+    static let cropSize = 512
     static let cleanSize = 512
-    private static let detailSigma: Float = 2.5
+    private static let detailSigma: Float = 1.25
 
     // FFHQ five-point template (eyes, nose tip, mouth corners), normalized.
     private static let normalizedTemplate: [(Float, Float)] = [
@@ -21,45 +22,63 @@ final class FaceRestorer {
         (0.39308822, 0.72541100), (0.61150205, 0.72490465)
     ]
 
-    private let cleanRunner: OrtRunner
-    private let detailRunner: OrtRunner
+    // Both run on the CPU (StyleGAN-style modulated convolutions can overflow the Neural Engine's
+    // 16-bit math and produce blank faces), and never at the same time, to keep memory low.
+    private let cleanURL: URL
+    private let detailURL: URL
 
-    init(cleanURL: URL, detailURL: URL) throws {
-        // Both stay on the CPU: StyleGAN-style modulated convolutions can overflow the Neural
-        // Engine's 16-bit math and produce blank faces.
-        cleanRunner = try OrtRunner(modelURL: cleanURL, useNeuralEngine: false)
-        detailRunner = try OrtRunner(modelURL: detailURL, useNeuralEngine: false)
+    init(cleanURL: URL, detailURL: URL) {
+        self.cleanURL = cleanURL
+        self.detailURL = detailURL
     }
 
     /// `landmarkScale` converts detector coordinates into `canvas` coordinates.
     func restore(_ canvas: RGBAImage, faces: [DetectedFace], landmarkScale: Float,
                  progress: (Double) -> Void) throws -> [RestoredFace] {
-        var results: [RestoredFace] = []
-        for (index, face) in faces.enumerated() {
-            try autoreleasepool {
-                let pts = face.landmarks.map { ($0.0 * landmarkScale, $0.1 * landmarkScale) }
-                let toCrop = Affine.similarity(from: pts, to: Self.template(Self.cropSize))
-                let toClean = Affine.similarity(from: pts, to: Self.template(Self.cleanSize))
+        let C = Self.cropSize, plane = C * C
+        let transforms = faces.map { face -> Affine in
+            let pts = face.landmarks.map { ($0.0 * landmarkScale, $0.1 * landmarkScale) }
+            return Affine.similarity(from: pts, to: Self.template(C))
+        }
+        let n = Double(max(faces.count, 1))
 
-                // Clean face (GFPGAN, 512).
-                let cOut = try run(cleanRunner, canvas: canvas, toCrop: toClean, size: Self.cleanSize)
-                var clean = [UInt8](repeating: 0, count: Self.cleanSize * Self.cleanSize * 3)
-                let cp = Self.cleanSize * Self.cleanSize
-                for i in 0..<cp {
-                    clean[i * 3] = toByte(cOut[i])
-                    clean[i * 3 + 1] = toByte(cOut[cp + i])
-                    clean[i * 3 + 2] = toByte(cOut[2 * cp + i])
+        // Pass 1: clean faces (GFPGAN), then release the model.
+        var cleans: [[UInt8]] = []
+        try autoreleasepool {
+            let runner = try OrtRunner(modelURL: cleanURL, useNeuralEngine: false)
+            for (i, toCrop) in transforms.enumerated() {
+                try autoreleasepool {
+                    let out = try run(runner, canvas: canvas, toCrop: toCrop, size: C)
+                    var clean = [UInt8](repeating: 0, count: plane * 3)
+                    for k in 0..<plane {
+                        clean[k * 3] = toByte(out[k])
+                        clean[k * 3 + 1] = toByte(out[plane + k])
+                        clean[k * 3 + 2] = toByte(out[2 * plane + k])
+                    }
+                    cleans.append(clean)
                 }
-                progress((Double(index) + 0.35) / Double(faces.count))
-
-                // Textured face (GPEN, 1024) -> keep only its fine detail.
-                let dOut = try run(detailRunner, canvas: canvas, toCrop: toCrop, size: Self.cropSize)
-                let detail = highPassToInt8(dOut, channels: 3, width: Self.cropSize, height: Self.cropSize,
-                                            sigma: Self.detailSigma)
-
-                results.append(RestoredFace(imageToCrop: toCrop, clean: clean, detail: detail))
+                progress(0.5 * Double(i + 1) / n)
             }
-            progress(Double(index + 1) / Double(faces.count))
+        }
+
+        // Pass 2: texture (GPEN high-pass), then release the model.
+        // Safety: if iOS is low on memory for us, skip the texture layer instead of being killed.
+        var results: [RestoredFace] = []
+        if os_proc_available_memory() < 900 * 1024 * 1024 {
+            return zip(transforms, cleans).map {
+                RestoredFace(imageToCrop: $0.0, clean: $0.1, detail: [Int8](repeating: 0, count: plane * 3))
+            }
+        }
+        try autoreleasepool {
+            let runner = try OrtRunner(modelURL: detailURL, useNeuralEngine: false)
+            for (i, toCrop) in transforms.enumerated() {
+                try autoreleasepool {
+                    let out = try run(runner, canvas: canvas, toCrop: toCrop, size: C)
+                    let detail = highPassToInt8(out, channels: 3, width: C, height: C, sigma: Self.detailSigma)
+                    results.append(RestoredFace(imageToCrop: toCrop, clean: cleans[i], detail: detail))
+                }
+                progress(0.5 + 0.5 * Double(i + 1) / n)
+            }
         }
         return results
     }

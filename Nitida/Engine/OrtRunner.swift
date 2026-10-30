@@ -23,6 +23,13 @@ final class OrtRunner {
         return e
     }
 
+    static let coreMLCacheDirectory: URL = {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let dir = base.appendingPathComponent("CoreMLModels", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
     let session: ORTSession
     let inputName: String
     let outputNames: [String]
@@ -36,11 +43,18 @@ final class OrtRunner {
             try o.setGraphOptimizationLevel(ORTGraphOptimizationLevel.all)
             let threads = max(1, min(ProcessInfo.processInfo.activeProcessorCount, 6))
             try o.setIntraOpNumThreads(Int32(threads))
+            // Lower peak memory: don't keep a growing CPU arena or pre-planned buffers around.
+            try? o.addConfigEntry(withKey: "session.use_device_allocator_for_initializers", value: "1")
             if neural {
-                let coreML = ORTCoreMLExecutionProviderOptions()
-                coreML.createMLProgram = true
-                coreML.enableOnSubgraphs = true
-                try o.appendCoreMLExecutionProvider(with: coreML)
+                // Cache the compiled Core ML model so it is only built the first time, not every run.
+                let cache = OrtRunner.coreMLCacheDirectory.path
+                try o.appendCoreMLExecutionProvider(withOptionsV2: [
+                    "MLComputeUnits": "CPUAndNeuralEngine",   // no GPU: it is not allowed in the background
+                    "ModelFormat": "MLProgram",
+                    "RequireStaticInputShapes": "1",
+                    "EnableOnSubgraphs": "1",
+                    "ModelCacheDirectory": cache
+                ])
             }
             return o
         }

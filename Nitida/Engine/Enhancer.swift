@@ -15,14 +15,14 @@ struct EnhanceResult {
 }
 
 enum EnhanceQuality: String, CaseIterable {
-    /// Same models, smaller working size: faces get the same full restoration.
+    /// Light, very fast model for the whole photo; faces get the same full restoration.
     case fast
-    /// Larger working size: more detail in the rest of the photo, can take minutes.
+    /// Heavier models with a texture layer on the whole photo; can take a few minutes.
     case max
 
     var label: String { self == .fast ? "Rápida" : "Máxima calidad" }
     /// Long-side cap for the input; output is at most maxInputSide * 4.
-    var maxInputSide: Int { self == .fast ? 384 : 1024 }
+    var maxInputSide: Int { self == .fast ? 512 : 1024 }
 }
 
 enum Enhancer {
@@ -40,12 +40,16 @@ enum Enhancer {
         }
 
         // 2. Restore and enlarge the whole photo (clean tones + texture layer).
+        let upShare = faces.isEmpty ? 0.94 : (quality == .fast ? 0.15 : 0.6)
+        let faceStart = 0.04 + upShare
         let up: Upscaler.Output
         do {
-            let upscaler = try Upscaler(cleanURL: models.upscaler, textureURL: models.textureUpscaler,
-                                        useNeuralEngine: useNeuralEngine)
+            let upscaler = quality == .fast
+                ? Upscaler(cleanURL: models.fastUpscaler, textureURL: nil, useNeuralEngine: useNeuralEngine)
+                : Upscaler(cleanURL: models.upscaler, textureURL: models.textureUpscaler,
+                           useNeuralEngine: useNeuralEngine)
             up = try upscaler.upscale(input) { p in
-                progress(0.04 + (faces.isEmpty ? 0.94 : 0.6) * p, "Mejorando toda la foto…")
+                progress(0.04 + upShare * p, "Mejorando toda la foto…")
             }
         }
 
@@ -53,11 +57,11 @@ enum Enhancer {
         var restored: [RestoredFace] = []
         if !faces.isEmpty {
             let label = faces.count == 1 ? "Reconstruyendo la cara…" : "Reconstruyendo \(faces.count) caras…"
-            progress(0.65, label)
+            progress(faceStart, label)
             let canvas = Upscaler.applyDetail(base: up.base, detail: up.detail, amount: 1)
-            let restorer = try FaceRestorer(cleanURL: models.faceRestorer, detailURL: models.faceTexture)
+            let restorer = FaceRestorer(cleanURL: models.faceRestorer, detailURL: models.faceTexture)
             restored = try restorer.restore(canvas, faces: faces, landmarkScale: Float(Upscaler.scale)) { p in
-                progress(0.65 + 0.33 * p, label)
+                progress(faceStart + (0.98 - faceStart) * p, label)
             }
         }
         progress(1, "Listo")

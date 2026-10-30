@@ -15,6 +15,7 @@ final class ModelStore: ObservableObject {
         let detector: URL
         let upscaler: URL
         let textureUpscaler: URL
+        let fastUpscaler: URL
         let faceRestorer: URL
         let faceTexture: URL
     }
@@ -31,11 +32,13 @@ final class ModelStore: ObservableObject {
     nonisolated static let upscaler = Model(file: "real_esrgan_x4_fp16.onnx", size: 36_144_084)
     // Nomos8k SC x4: only its fine texture (skin, hair, fabric) is layered on top.
     nonisolated static let textureUpscaler = Model(file: "nomos8k_sc_x4.onnx", size: 67_002_465)
+    // SPAN x4 (Clear Reality): very fast whole-photo model for the Rápida mode.
+    nonisolated static let fastUpscaler = Model(file: "clear_reality_x4.onnx", size: 1_718_947)
     // GFPGAN 1.4: flattering, clean facial features.
     nonisolated static let faceRestorer = Model(file: "gfpgan_1.4.onnx", size: 340_299_087)
-    // GPEN-BFR-1024: only its fine texture (pores, lashes, lip lines) is layered on the face.
-    nonisolated static let faceTexture = Model(file: "gpen_bfr_1024.onnx", size: 285_203_703)
-    nonisolated static let all = [detector, upscaler, textureUpscaler, faceRestorer, faceTexture]
+    // GPEN-BFR-512: only its fine texture (pores, lashes, lip lines) is layered on the face.
+    nonisolated static let faceTexture = Model(file: "gpen_bfr_512.onnx", size: 284_340_240)
+    nonisolated static let all = [detector, fastUpscaler, upscaler, textureUpscaler, faceRestorer, faceTexture]
     nonisolated static var totalBytes: Int64 { all.reduce(0) { $0 + $1.size } }
 
     @Published private(set) var state: State = .missing
@@ -70,7 +73,7 @@ final class ModelStore: ObservableObject {
 
     var paths: Paths {
         Paths(detector: path(Self.detector), upscaler: path(Self.upscaler),
-              textureUpscaler: path(Self.textureUpscaler),
+              textureUpscaler: path(Self.textureUpscaler), fastUpscaler: path(Self.fastUpscaler),
               faceRestorer: path(Self.faceRestorer), faceTexture: path(Self.faceTexture))
     }
 

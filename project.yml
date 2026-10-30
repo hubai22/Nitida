@@ -36,6 +36,10 @@ targets:
         UIRequiresFullScreen: true
         NSPhotoLibraryAddUsageDescription: Nítida guarda tus fotos mejoradas en la Fototeca.
         ITSAppUsesNonExemptEncryption: false
+        BGTaskSchedulerPermittedIdentifiers:
+          - nitida.enhance.*
+        UIBackgroundModes:
+          - processing
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nitida.app

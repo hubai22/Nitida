@@ -67,11 +67,14 @@ final class EditorModel: ObservableObject {
         phase = .working(0, "Preparando…")
         UserDefaults.standard.set(true, forKey: Self.inFlightKey)
         UIApplication.shared.isIdleTimerDisabled = true
+        let background = BackgroundRun()
+        background.start()
 
         Task {
             let outcome: Result<(EnhanceResult, UIImage?), Error> = await Task.detached(priority: .userInitiated) {
                 do {
                     let r = try Enhancer.run(image: image, models: models, quality: quality, useNeuralEngine: useNE) { p, label in
+                        background.update(p)
                         Task { @MainActor [weak self] in
                             guard let self, case .working = self.phase else { return }
                             self.phase = .working(p, label)
@@ -85,6 +88,7 @@ final class EditorModel: ObservableObject {
 
             UserDefaults.standard.set(false, forKey: Self.inFlightKey)
             UIApplication.shared.isIdleTimerDisabled = false
+            if case .success = outcome { background.finish(success: true) } else { background.finish(success: false) }
             switch outcome {
             case .success(let (r, img)):
                 result = r

@@ -93,7 +93,7 @@ struct ContentView: View {
                         .progressViewStyle(.linear)
                         .frame(maxWidth: 240)
                     Text(label).font(.headline)
-                    Text("\(Int(p * 100)) %  ·  No cierres la app")
+                    Text("\(Int(p * 100)) %  ·  Puedes salir de la app, seguirá trabajando")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -140,8 +140,8 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
                     Text(quality == EnhanceQuality.max.rawValue
-                         ? "Más detalle en el fondo, pero puede tardar varios minutos."
-                         : "Caras con el mismo detalle; el resto de la foto se procesa más pequeño para ir rápido.")
+                         ? "Añade textura real a toda la foto (fondo, pelo, ropa). Tarda más."
+                         : "Caras con todo el detalle y textura; el resto de la foto se mejora en segundos.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
