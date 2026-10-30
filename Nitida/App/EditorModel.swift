@@ -26,6 +26,7 @@ final class EditorModel: ObservableObject {
     /// Set while a run is in progress; if the app dies mid-run we turn off acceleration next time.
     nonisolated private static let inFlightKey = "runInFlight"
     nonisolated static let neuralEngineKey = "useNeuralEngine"
+    nonisolated static let qualityKey = "quality"
 
     init() {
         let d = UserDefaults.standard
@@ -57,6 +58,7 @@ final class EditorModel: ObservableObject {
         guard let image = original else { return }
         if case .working = phase { return }
         let useNE = UserDefaults.standard.object(forKey: Self.neuralEngineKey) as? Bool ?? true
+        let quality = EnhanceQuality(rawValue: UserDefaults.standard.string(forKey: Self.qualityKey) ?? "") ?? .fast
         let strength = Float(self.strength)
         phase = .working(0, "Preparando…")
         UserDefaults.standard.set(true, forKey: Self.inFlightKey)
@@ -65,7 +67,7 @@ final class EditorModel: ObservableObject {
         Task {
             let outcome: Result<(EnhanceResult, UIImage?), Error> = await Task.detached(priority: .userInitiated) {
                 do {
-                    let r = try Enhancer.run(image: image, models: models, useNeuralEngine: useNE) { p, label in
+                    let r = try Enhancer.run(image: image, models: models, quality: quality, useNeuralEngine: useNE) { p, label in
                         Task { @MainActor [weak self] in
                             guard let self, case .working = self.phase else { return }
                             self.phase = .working(p, label)

@@ -1,6 +1,6 @@
 import Foundation
 
-/// Downloads the AI models once (≈380 MB) and keeps them in Application Support.
+/// Downloads the AI models once (≈420 MB) and keeps them in Application Support.
 @MainActor
 final class ModelStore: ObservableObject {
     struct Model {
@@ -14,6 +14,7 @@ final class ModelStore: ObservableObject {
     struct Paths {
         let detector: URL
         let upscaler: URL
+        let upscalerFast: URL
         let faceRestorer: URL
     }
 
@@ -26,8 +27,9 @@ final class ModelStore: ObservableObject {
 
     nonisolated static let detector = Model(file: "scrfd_2.5g.onnx", size: 3_295_067)
     nonisolated static let upscaler = Model(file: "real_esrgan_x4_fp16.onnx", size: 36_144_084)
+    nonisolated static let upscalerFast = Model(file: "real_esrgan_x2_fp16.onnx", size: 36_146_329)
     nonisolated static let faceRestorer = Model(file: "gfpgan_1.4.onnx", size: 340_299_087)
-    nonisolated static let all = [detector, upscaler, faceRestorer]
+    nonisolated static let all = [detector, upscalerFast, upscaler, faceRestorer]
     nonisolated static var totalBytes: Int64 { all.reduce(0) { $0 + $1.size } }
 
     @Published private(set) var state: State = .missing
@@ -54,7 +56,13 @@ final class ModelStore: ObservableObject {
     }
 
     var paths: Paths {
-        Paths(detector: path(Self.detector), upscaler: path(Self.upscaler), faceRestorer: path(Self.faceRestorer))
+        Paths(detector: path(Self.detector), upscaler: path(Self.upscaler),
+              upscalerFast: path(Self.upscalerFast), faceRestorer: path(Self.faceRestorer))
+    }
+
+    /// Bytes still to download (only missing models are fetched).
+    var remainingBytes: Int64 {
+        Self.all.filter { !isInstalled($0) }.reduce(0) { $0 + $1.size }
     }
 
     private func path(_ m: Model) -> URL { folder.appendingPathComponent(m.file) }

@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var showSettings = false
     @State private var toast: String?
+    @AppStorage(EditorModel.qualityKey) private var quality: String = EnhanceQuality.fast.rawValue
 
     private let accent = Color("AccentColor")
 
@@ -131,6 +132,19 @@ struct ContentView: View {
             picker(label: "Elegir foto", prominent: true)
         case .picked:
             VStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Picker("Modo", selection: $quality) {
+                        ForEach(EnhanceQuality.allCases, id: \.rawValue) { q in
+                            Text(q.label).tag(q.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Text(quality == EnhanceQuality.max.rawValue
+                         ? "Más detalle en el fondo, pero puede tardar varios minutos."
+                         : "Caras con la misma calidad y el resto de la foto mucho más rápido.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Button {
                     editor.enhance(models: models.paths)
                 } label: {
@@ -278,7 +292,7 @@ struct ModelSetupCard: View {
     }
 
     private var sizeText: String {
-        ByteCountFormatter.string(fromByteCount: ModelStore.totalBytes, countStyle: .file)
+        ByteCountFormatter.string(fromByteCount: store.remainingBytes, countStyle: .file)
     }
 }
 
@@ -297,7 +311,7 @@ struct SettingsView: View {
                     Text("Usa el chip de IA del iPhone para procesar más rápido. Si alguna foto sale rara o la app se cierra al mejorar, desactívalo.")
                 }
                 Section("Cómo funciona") {
-                    Text("1. Real-ESRGAN limpia y amplía toda la foto ×4 (fondo, pelo, ropa, texto).")
+                    Text("1. Real-ESRGAN limpia y amplía toda la foto: ×2 en modo Rápida, ×4 en Máxima calidad (fondo, pelo, ropa, texto).")
                     Text("2. SCRFD localiza las caras.")
                     Text("3. GFPGAN reconstruye los rasgos de cada cara y se mezcla con la foto.")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")

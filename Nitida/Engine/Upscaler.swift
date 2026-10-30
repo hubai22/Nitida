@@ -1,19 +1,20 @@
 import Foundation
 
-/// Whole-photo restoration + 4x super-resolution (Real-ESRGAN), processed in fixed-size tiles
+/// Whole-photo restoration + super-resolution (Real-ESRGAN x2 or x4), processed in fixed-size tiles
 /// so memory stays bounded and the Neural Engine sees one static input shape.
 final class Upscaler {
-    static let scale = 4
+    let scale: Int
     private let tile = 192
     private let pad = 32
     private let runner: OrtRunner
 
-    init(modelURL: URL, useNeuralEngine: Bool) throws {
+    init(modelURL: URL, scale: Int, useNeuralEngine: Bool) throws {
+        self.scale = scale
         runner = try OrtRunner(modelURL: modelURL, useNeuralEngine: useNeuralEngine)
     }
 
     func upscale(_ img: RGBAImage, progress: (Double) -> Void) throws -> RGBAImage {
-        let sc = Upscaler.scale
+        let sc = scale
         let w = img.width, h = img.height
         let S = tile + 2 * pad
         let plane = S * S
