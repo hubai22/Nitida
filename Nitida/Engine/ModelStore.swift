@@ -1,6 +1,6 @@
 import Foundation
 
-/// Downloads the AI models once (≈355 MB) and keeps them in Application Support.
+/// Downloads the AI models once (≈730 MB) and keeps them in Application Support.
 @MainActor
 final class ModelStore: ObservableObject {
     struct Model {
@@ -14,7 +14,9 @@ final class ModelStore: ObservableObject {
     struct Paths {
         let detector: URL
         let upscaler: URL
+        let textureUpscaler: URL
         let faceRestorer: URL
+        let faceTexture: URL
     }
 
     enum State: Equatable {
@@ -25,11 +27,15 @@ final class ModelStore: ObservableObject {
     }
 
     nonisolated static let detector = Model(file: "scrfd_2.5g.onnx", size: 3_295_067)
-    // Nomos8k SC: x4 super-resolution trained to synthesize real-world texture (skin, hair, fabric).
-    nonisolated static let upscaler = Model(file: "nomos8k_sc_x4.onnx", size: 67_002_465)
-    // GPEN-BFR-1024: face restoration that keeps pores and fine detail instead of smoothing.
-    nonisolated static let faceRestorer = Model(file: "gpen_bfr_1024.onnx", size: 285_203_703)
-    nonisolated static let all = [detector, upscaler, faceRestorer]
+    // Real-ESRGAN x4: clean, natural tones for the whole photo.
+    nonisolated static let upscaler = Model(file: "real_esrgan_x4_fp16.onnx", size: 36_144_084)
+    // Nomos8k SC x4: only its fine texture (skin, hair, fabric) is layered on top.
+    nonisolated static let textureUpscaler = Model(file: "nomos8k_sc_x4.onnx", size: 67_002_465)
+    // GFPGAN 1.4: flattering, clean facial features.
+    nonisolated static let faceRestorer = Model(file: "gfpgan_1.4.onnx", size: 340_299_087)
+    // GPEN-BFR-1024: only its fine texture (pores, lashes, lip lines) is layered on the face.
+    nonisolated static let faceTexture = Model(file: "gpen_bfr_1024.onnx", size: 285_203_703)
+    nonisolated static let all = [detector, upscaler, textureUpscaler, faceRestorer, faceTexture]
     nonisolated static var totalBytes: Int64 { all.reduce(0) { $0 + $1.size } }
 
     @Published private(set) var state: State = .missing
@@ -63,7 +69,9 @@ final class ModelStore: ObservableObject {
     }
 
     var paths: Paths {
-        Paths(detector: path(Self.detector), upscaler: path(Self.upscaler), faceRestorer: path(Self.faceRestorer))
+        Paths(detector: path(Self.detector), upscaler: path(Self.upscaler),
+              textureUpscaler: path(Self.textureUpscaler),
+              faceRestorer: path(Self.faceRestorer), faceTexture: path(Self.faceTexture))
     }
 
     /// Bytes still to download (only missing models are fetched).

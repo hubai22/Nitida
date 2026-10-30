@@ -173,17 +173,9 @@ struct ContentView: View {
             }
         case .done:
             VStack(spacing: 12) {
+                sliderRow("Textura", value: $editor.texture, range: 0...1.5)
                 if editor.facesFound > 0 {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Intensidad en caras").font(.subheadline.weight(.medium))
-                            Spacer()
-                            Text("\(Int(editor.strength * 100)) %")
-                                .font(.subheadline.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(value: $editor.strength, in: 0...1)
-                    }
+                    sliderRow("Intensidad en caras", value: $editor.strength, range: 0...1)
                 } else {
                     Text("No se detectaron caras: se mejoró la foto completa.")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -209,6 +201,19 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func sliderRow(_ title: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(title).font(.subheadline.weight(.medium))
+                Spacer()
+                Text("\(Int((value.wrappedValue * 100).rounded())) %")
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range)
         }
     }
 
@@ -311,15 +316,15 @@ struct SettingsView: View {
                     Text("Usa el chip de IA del iPhone para procesar más rápido. Si alguna foto sale rara o la app se cierra al mejorar, desactívalo.")
                 }
                 Section("Cómo funciona") {
-                    Text("1. Nomos8k limpia la foto, la amplía ×4 y genera textura real en piel, pelo, ropa y fondo.")
+                    Text("1. Real-ESRGAN limpia y amplía la foto ×4; Nomos8k le añade textura real (piel, pelo, ropa, fondo).")
                     Text("2. SCRFD localiza las caras.")
-                    Text("3. GPEN reconstruye cada cara a 1024 px: poros, pestañas, iris y labios, sin efecto plástico.")
+                    Text("3. GFPGAN reconstruye los rasgos de cada cara y GPEN-1024 le añade poros, pestañas y líneas de labios. Ajusta la cantidad con «Textura».")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
                 Section("Créditos") {
-                    Text("GPEN (Yang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
+                    Text("GFPGAN (Tencent ARC), GPEN (Yang et al.), Real-ESRGAN (X. Wang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -15,8 +15,11 @@ final class EditorModel: ObservableObject {
     @Published private(set) var original: UIImage?
     @Published private(set) var enhanced: UIImage?
     @Published private(set) var facesFound = 0
-    @Published var strength: Double = 0.9 {
+    @Published var strength: Double = 1.0 {
         didSet { if oldValue != strength { rerender() } }
+    }
+    @Published var texture: Double = 1.0 {
+        didSet { if oldValue != texture { rerender() } }
     }
     @Published var notice: String?
 
@@ -60,6 +63,7 @@ final class EditorModel: ObservableObject {
         let useNE = UserDefaults.standard.object(forKey: Self.neuralEngineKey) as? Bool ?? true
         let quality = EnhanceQuality(rawValue: UserDefaults.standard.string(forKey: Self.qualityKey) ?? "") ?? .fast
         let strength = Float(self.strength)
+        let texture = Float(self.texture)
         phase = .working(0, "Preparando…")
         UserDefaults.standard.set(true, forKey: Self.inFlightKey)
         UIApplication.shared.isIdleTimerDisabled = true
@@ -73,7 +77,7 @@ final class EditorModel: ObservableObject {
                             self.phase = .working(p, label)
                         }
                     }
-                    return .success((r, r.render(strength: strength)))
+                    return .success((r, r.render(strength: strength, texture: texture)))
                 } catch {
                     return .failure(error)
                 }
@@ -96,11 +100,12 @@ final class EditorModel: ObservableObject {
     private func rerender() {
         guard let r = result else { return }
         let s = Float(strength)
+        let t = Float(texture)
         renderTask?.cancel()
         renderTask = Task {
             try? await Task.sleep(nanoseconds: 60_000_000)
             if Task.isCancelled { return }
-            let img = await Task.detached(priority: .userInitiated) { r.render(strength: s) }.value
+            let img = await Task.detached(priority: .userInitiated) { r.render(strength: s, texture: t) }.value
             if !Task.isCancelled, let img { enhanced = img }
         }
     }

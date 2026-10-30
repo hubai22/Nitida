@@ -1,14 +1,16 @@
 import UIKit
 
-/// Output of a run. Faces are kept separately so the face intensity slider re-blends instantly.
+/// Output of a run. Detail layers and faces are kept separately so the sliders re-blend instantly.
 struct EnhanceResult {
     let original: UIImage
     let base: RGBAImage
+    let detail: [Int8]
     let faces: [RestoredFace]
     let facesFound: Int
 
-    func render(strength: Float) -> UIImage? {
-        FaceRestorer.composite(base: base, faces: faces, strength: strength).uiImage()
+    func render(strength: Float, texture: Float) -> UIImage? {
+        let textured = Upscaler.applyDetail(base: base, detail: detail, amount: texture)
+        return FaceRestorer.composite(base: textured, faces: faces, strength: strength, texture: texture).uiImage()
     }
 }
 
@@ -19,7 +21,6 @@ enum EnhanceQuality: String, CaseIterable {
     case max
 
     var label: String { self == .fast ? "Rápida" : "Máxima calidad" }
-    var scale: Int { 4 }
     /// Long-side cap for the input; output is at most maxInputSide * 4.
     var maxInputSide: Int { self == .fast ? 384 : 1024 }
 }
@@ -38,28 +39,28 @@ enum Enhancer {
             faces = try detector.detect(input)
         }
 
-        // 2. Restore and enlarge the whole photo.
-        let base: RGBAImage
+        // 2. Restore and enlarge the whole photo (clean tones + texture layer).
+        let up: Upscaler.Output
         do {
-            let upscaler = try Upscaler(modelURL: models.upscaler, scale: quality.scale, useNeuralEngine: useNeuralEngine)
-            base = try upscaler.upscale(input) { p in
-                progress(0.05 + 0.65 * p, "Mejorando toda la foto…")
+            let upscaler = try Upscaler(cleanURL: models.upscaler, textureURL: models.textureUpscaler,
+                                        useNeuralEngine: useNeuralEngine)
+            up = try upscaler.upscale(input) { p in
+                progress(0.04 + (faces.isEmpty ? 0.94 : 0.6) * p, "Mejorando toda la foto…")
             }
         }
 
-        // 3. Rebuild facial detail.
+        // 3. Rebuild facial detail, working from the textured photo.
         var restored: [RestoredFace] = []
         if !faces.isEmpty {
             let label = faces.count == 1 ? "Reconstruyendo la cara…" : "Reconstruyendo \(faces.count) caras…"
-            progress(0.72, label)
-            // GPEN stays on the CPU: its StyleGAN modulated convolutions can overflow the Neural
-            // Engine's 16-bit math and produce blank faces.
-            let restorer = try FaceRestorer(modelURL: models.faceRestorer, useNeuralEngine: false)
-            restored = try restorer.restore(base, faces: faces, landmarkScale: Float(quality.scale)) { p in
-                progress(0.72 + 0.26 * p, label)
+            progress(0.65, label)
+            let canvas = Upscaler.applyDetail(base: up.base, detail: up.detail, amount: 1)
+            let restorer = try FaceRestorer(cleanURL: models.faceRestorer, detailURL: models.faceTexture)
+            restored = try restorer.restore(canvas, faces: faces, landmarkScale: Float(Upscaler.scale)) { p in
+                progress(0.65 + 0.33 * p, label)
             }
         }
         progress(1, "Listo")
-        return EnhanceResult(original: image, base: base, faces: restored, facesFound: faces.count)
+        return EnhanceResult(original: image, base: up.base, detail: up.detail, faces: restored, facesFound: faces.count)
     }
 }

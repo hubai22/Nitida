@@ -2,11 +2,11 @@
 
 App nativa para iPhone (iOS 16 o superior) que mejora fotos de baja calidad:
 
-1. **Toda la foto**: Nomos8k SC limpia artefactos de compresión, ruido y desenfoque, la amplía ×4 y genera textura real (piel, pelo, ropa, fondo).
-2. **Las caras**: SCRFD localiza cada cara y GPEN-1024 reconstruye poros, pestañas, iris, labios y pelo con detalle nuevo, sin efecto plástico (no es un filtro de nitidez).
-3. Comparador antes/después, control de intensidad en caras, guardar en Fotos y compartir.
+1. **Toda la foto**: Real-ESRGAN limpia artefactos, ruido y desenfoque y la amplía ×4; Nomos8k SC le añade textura real (piel, pelo, ropa, fondo).
+2. **Las caras**: SCRFD localiza cada cara, GFPGAN reconstruye los rasgos (ojos, labios, piel) y GPEN-1024 añade poros, pestañas y líneas finas, sin efecto plástico (no es un filtro de nitidez).
+3. Comparador antes/después, controles de textura e intensidad en caras, guardar en Fotos y compartir.
 
-Todo se procesa dentro del iPhone; las fotos no se suben a ningún servidor. La primera vez la app descarga el motor de IA (unos 355 MB, mejor con Wi-Fi).
+Todo se procesa dentro del iPhone; las fotos no se suben a ningún servidor. La primera vez la app descarga el motor de IA (unos 730 MB, mejor con Wi-Fi).
 
 ---
 
@@ -62,4 +62,4 @@ Si alguna foto sale rara o la app se cierra al mejorar, desactiva **Ajustes (⚙
 
 ## Licencias de los modelos
 
-GPEN (uso no comercial), Nomos8k SC (CC BY-NC-SA), SCRFD/InsightFace (uso no comercial). Esta app es para uso personal.
+GFPGAN (Apache 2.0), Real-ESRGAN (BSD-3), GPEN (uso no comercial), Nomos8k SC (CC BY-NC-SA), SCRFD/InsightFace (uso no comercial). Esta app es para uso personal.
