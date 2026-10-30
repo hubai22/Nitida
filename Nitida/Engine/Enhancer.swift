@@ -13,15 +13,15 @@ struct EnhanceResult {
 }
 
 enum EnhanceQuality: String, CaseIterable {
-    /// Lighter whole-photo model (x2, about 4x less work); faces get the same full restoration.
+    /// Same models, smaller working size: faces get the same full restoration.
     case fast
-    /// Heaviest model (x4) on a larger input: best background detail, can take minutes.
+    /// Larger working size: more detail in the rest of the photo, can take minutes.
     case max
 
     var label: String { self == .fast ? "Rápida" : "Máxima calidad" }
-    var scale: Int { self == .fast ? 2 : 4 }
-    /// Long-side cap for the input; output is at most maxInputSide * scale.
-    var maxInputSide: Int { self == .fast ? 768 : 1024 }
+    var scale: Int { 4 }
+    /// Long-side cap for the input; output is at most maxInputSide * 4.
+    var maxInputSide: Int { self == .fast ? 384 : 1024 }
 }
 
 enum Enhancer {
@@ -41,8 +41,7 @@ enum Enhancer {
         // 2. Restore and enlarge the whole photo.
         let base: RGBAImage
         do {
-            let modelURL = quality == .fast ? models.upscalerFast : models.upscaler
-            let upscaler = try Upscaler(modelURL: modelURL, scale: quality.scale, useNeuralEngine: useNeuralEngine)
+            let upscaler = try Upscaler(modelURL: models.upscaler, scale: quality.scale, useNeuralEngine: useNeuralEngine)
             base = try upscaler.upscale(input) { p in
                 progress(0.05 + 0.65 * p, "Mejorando toda la foto…")
             }
@@ -53,8 +52,8 @@ enum Enhancer {
         if !faces.isEmpty {
             let label = faces.count == 1 ? "Reconstruyendo la cara…" : "Reconstruyendo \(faces.count) caras…"
             progress(0.72, label)
-            // GFPGAN stays on the CPU: its modulated convolutions can overflow the Neural Engine's
-            // 16-bit math and produce blank faces. It's one 512x512 pass per face, so it's quick anyway.
+            // GPEN stays on the CPU: its StyleGAN modulated convolutions can overflow the Neural
+            // Engine's 16-bit math and produce blank faces.
             let restorer = try FaceRestorer(modelURL: models.faceRestorer, useNeuralEngine: false)
             restored = try restorer.restore(base, faces: faces, landmarkScale: Float(quality.scale)) { p in
                 progress(0.72 + 0.26 * p, label)

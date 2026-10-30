@@ -141,7 +141,7 @@ struct ContentView: View {
                     .pickerStyle(.segmented)
                     Text(quality == EnhanceQuality.max.rawValue
                          ? "Más detalle en el fondo, pero puede tardar varios minutos."
-                         : "Caras con la misma calidad y el resto de la foto mucho más rápido.")
+                         : "Caras con el mismo detalle; el resto de la foto se procesa más pequeño para ir rápido.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -311,15 +311,15 @@ struct SettingsView: View {
                     Text("Usa el chip de IA del iPhone para procesar más rápido. Si alguna foto sale rara o la app se cierra al mejorar, desactívalo.")
                 }
                 Section("Cómo funciona") {
-                    Text("1. Real-ESRGAN limpia y amplía toda la foto: ×2 en modo Rápida, ×4 en Máxima calidad (fondo, pelo, ropa, texto).")
+                    Text("1. Nomos8k limpia la foto, la amplía ×4 y genera textura real en piel, pelo, ropa y fondo.")
                     Text("2. SCRFD localiza las caras.")
-                    Text("3. GFPGAN reconstruye los rasgos de cada cara y se mezcla con la foto.")
+                    Text("3. GPEN reconstruye cada cara a 1024 px: poros, pestañas, iris y labios, sin efecto plástico.")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
                 Section("Créditos") {
-                    Text("GFPGAN (Tencent ARC), Real-ESRGAN (X. Wang et al.), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
+                    Text("GPEN (Yang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

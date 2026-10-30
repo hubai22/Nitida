@@ -15,7 +15,7 @@ final class EditorModel: ObservableObject {
     @Published private(set) var original: UIImage?
     @Published private(set) var enhanced: UIImage?
     @Published private(set) var facesFound = 0
-    @Published var strength: Double = 1.0 {
+    @Published var strength: Double = 0.9 {
         didSet { if oldValue != strength { rerender() } }
     }
     @Published var notice: String?

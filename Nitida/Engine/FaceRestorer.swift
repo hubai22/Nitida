@@ -1,21 +1,23 @@
 import Foundation
 
-/// A face rebuilt by the restoration model, plus the transform from image space into its 512x512 crop.
+/// A face rebuilt by the restoration model, plus the transform from image space into its aligned crop.
 struct RestoredFace {
     let imageToCrop: Affine
-    let pixels: [UInt8]   // 512*512 RGB
+    let pixels: [UInt8]   // cropSize*cropSize RGB
 }
 
-/// GFPGAN face restoration: aligns each face to the FFHQ template, regenerates detail, and
-/// blends it back into the photo with a feathered mask.
+/// GPEN-BFR-1024 face restoration: aligns each face to the FFHQ template, regenerates realistic
+/// skin texture, eyes, lips and hair at 1024 px, and blends it back with a feathered mask.
 final class FaceRestorer {
-    static let cropSize = 512
-    // FFHQ 512 five-point template (eyes, nose tip, mouth corners).
+    static let cropSize = 1024
+    // FFHQ five-point template (eyes, nose tip, mouth corners).
     private static let normalizedTemplate: [(Float, Float)] = [
         (0.37691676, 0.46864664), (0.62285697, 0.46912813), (0.50123859, 0.61331904),
         (0.39308822, 0.72541100), (0.61150205, 0.72490465)
     ]
-    private static let template: [(Float, Float)] = normalizedTemplate.map { ($0.0 * 512, $0.1 * 512) }
+    private static let template: [(Float, Float)] = normalizedTemplate.map {
+        ($0.0 * Float(cropSize), $0.1 * Float(cropSize))
+    }
 
     private let runner: OrtRunner
 
@@ -79,7 +81,7 @@ final class FaceRestorer {
     private static func mask(_ u: Float, _ v: Float) -> Float {
         let edge = Float(cropSize - 1)
         let d = min(min(u, v), min(edge - u, edge - v))
-        let t = min(max((d - 4) / 40, 0), 1)
+        let t = min(max((d - 8) / 80, 0), 1)
         return t * t * (3 - 2 * t)
     }
 
