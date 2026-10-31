@@ -1,0 +1,28 @@
+name: Preparar modelos de IA
+
+on:
+  push:
+    branches: [main]
+    paths: [tools/bake_onnx_scalar.py, .github/workflows/models.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  codeformer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargar CodeFormer
+        run: curl -sSL -o codeformer.onnx https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/codeformer.onnx
+      - name: Integrar fidelidad 0.9
+        run: python3 tools/bake_onnx_scalar.py codeformer.onnx codeformer_w09.onnx 0.9 && ls -l codeformer_w09.onnx
+      - name: Publicar
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: models-1
+          name: Modelos de IA
+          make_latest: false
+          files: codeformer_w09.onnx
+          body: CodeFormer (S-Lab License 1.0, uso no comercial) con fidelidad 0.9 integrada, para Nítida.
