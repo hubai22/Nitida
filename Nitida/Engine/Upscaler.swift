@@ -27,9 +27,14 @@ final class Upscaler {
         self.useNeuralEngine = useNeuralEngine
     }
 
-    func upscale(_ img: RGBAImage, progress: (Double) -> Void) throws -> Output {
+    /// Model scale is always 4; `outScale` (1, 2 or 4) box-averages each tile down so large photos
+    /// keep all their real detail without producing gigantic outputs.
+    func upscale(_ img: RGBAImage, outScale: Int, progress: (Double) -> Void) throws -> Output {
         let sc = Upscaler.scale
-        let W = img.width * sc, H = img.height * sc
+        let os = outScale
+        let fct = sc / os                     // model pixels per output pixel (per side)
+        let norm = 1 / Float(fct * fct)
+        let W = img.width * os, H = img.height * os
         var out = RGBAImage(width: W, height: H)
         var detail = [Int8](repeating: 0, count: textureURL == nil ? 0 : W * H * 3)
         let firstShare = textureURL == nil ? 1.0 : 0.5
@@ -40,15 +45,22 @@ final class Upscaler {
             try forEachTile(img, runner: runner, progress: { progress(firstShare * $0) }) { f, OS, oplane, x0, y0, vw, vh in
                 out.pixels.withUnsafeMutableBufferPointer { dstBuf in
                     let dst = dstBuf.baseAddress!
-                    for yy in 0..<(vh * sc) {
-                        let oy = self.pad * sc + yy
-                        let dy = y0 * sc + yy
-                        for xx in 0..<(vw * sc) {
-                            let si = oy * OS + self.pad * sc + xx
-                            let di = (dy * W + x0 * sc + xx) * 4
-                            dst[di] = toByte(f[si] * 255)
-                            dst[di + 1] = toByte(f[oplane + si] * 255)
-                            dst[di + 2] = toByte(f[2 * oplane + si] * 255)
+                    let base = self.pad * sc
+                    for yy in 0..<(vh * os) {
+                        let dy = y0 * os + yy
+                        for xx in 0..<(vw * os) {
+                            var r: Float = 0, g: Float = 0, b: Float = 0
+                            for ky in 0..<fct {
+                                let row = (base + yy * fct + ky) * OS + base + xx * fct
+                                for kx in 0..<fct {
+                                    let si = row + kx
+                                    r += f[si]; g += f[oplane + si]; b += f[2 * oplane + si]
+                                }
+                            }
+                            let di = (dy * W + x0 * os + xx) * 4
+                            dst[di] = toByte(r * norm * 255)
+                            dst[di + 1] = toByte(g * norm * 255)
+                            dst[di + 2] = toByte(b * norm * 255)
                         }
                     }
                 }
@@ -62,18 +74,27 @@ final class Upscaler {
             try forEachTile(img, runner: runner, progress: { progress(0.5 + 0.5 * $0) }) { f, OS, oplane, x0, y0, vw, vh in
                 var planes = [Float](repeating: 0, count: 3 * oplane)
                 for i in 0..<(3 * oplane) { planes[i] = min(max(f[i], 0), 1) * 255 }
-                let hp = highPassToInt8(planes, channels: 3, width: OS, height: OS, sigma: self.detailSigma)
+                // Detail scale follows the output resolution.
+                let hp = highPassToInt8(planes, channels: 3, width: OS, height: OS,
+                                        sigma: self.detailSigma * Float(fct))
                 detail.withUnsafeMutableBufferPointer { dBuf in
                     let d = dBuf.baseAddress!
-                    for yy in 0..<(vh * sc) {
-                        let oy = self.pad * sc + yy
-                        let dy = y0 * sc + yy
-                        for xx in 0..<(vw * sc) {
-                            let si = oy * OS + self.pad * sc + xx
-                            let di = (dy * W + x0 * sc + xx) * 3
-                            d[di] = hp[si]
-                            d[di + 1] = hp[oplane + si]
-                            d[di + 2] = hp[2 * oplane + si]
+                    let base = self.pad * sc
+                    for yy in 0..<(vh * os) {
+                        let dy = y0 * os + yy
+                        for xx in 0..<(vw * os) {
+                            var r: Float = 0, g: Float = 0, b: Float = 0
+                            for ky in 0..<fct {
+                                let row = (base + yy * fct + ky) * OS + base + xx * fct
+                                for kx in 0..<fct {
+                                    let si = row + kx
+                                    r += Float(hp[si]); g += Float(hp[oplane + si]); b += Float(hp[2 * oplane + si])
+                                }
+                            }
+                            let di = (dy * W + x0 * os + xx) * 3
+                            d[di] = Int8(min(max((r * norm).rounded(), -127), 127))
+                            d[di + 1] = Int8(min(max((g * norm).rounded(), -127), 127))
+                            d[di + 2] = Int8(min(max((b * norm).rounded(), -127), 127))
                         }
                     }
                 }

@@ -17,12 +17,13 @@ struct EnhanceResult {
 enum EnhanceQuality: String, CaseIterable {
     /// Light, very fast model for the whole photo; faces get the same full restoration.
     case fast
-    /// Heavier models with a texture layer on the whole photo; can take a few minutes.
+    /// Heavier models with a texture layer on the whole photo; takes longer.
     case max
 
     var label: String { self == .fast ? "Rápida" : "Máxima calidad" }
-    /// Long-side cap for the input; output is at most maxInputSide * 4.
-    var maxInputSide: Int { self == .fast ? 512 : 1024 }
+    /// Largest side the photo is processed at. The photo is never shrunk below this, so its real
+    /// detail is kept; output is 4x (small photos) or 2x (larger ones), at most ~4096 px.
+    var maxInputSide: Int { self == .fast ? 2048 : 1280 }
 }
 
 enum Enhancer {
@@ -30,6 +31,8 @@ enum Enhancer {
                     progress: @escaping (Double, String) -> Void) throws -> EnhanceResult {
         progress(0, "Preparando la foto…")
         guard let input = RGBAImage.from(image, maxSide: quality.maxInputSide) else { throw EngineError.imageDecode }
+        let longSide = max(input.width, input.height)
+        let outScale = longSide <= 1024 ? 4 : 2
 
         // 1. Find faces on the original.
         progress(0.02, "Buscando caras…")
@@ -39,8 +42,8 @@ enum Enhancer {
             faces = try detector.detect(input)
         }
 
-        // 2. Restore and enlarge the whole photo (clean tones + texture layer).
-        let upShare = faces.isEmpty ? 0.94 : (quality == .fast ? 0.15 : 0.6)
+        // 2. Enhance and enlarge the whole photo.
+        let upShare = faces.isEmpty ? 0.94 : (quality == .fast ? 0.45 : 0.75)
         let faceStart = 0.04 + upShare
         let up: Upscaler.Output
         do {
@@ -48,19 +51,19 @@ enum Enhancer {
                 ? Upscaler(cleanURL: models.fastUpscaler, textureURL: nil, useNeuralEngine: useNeuralEngine)
                 : Upscaler(cleanURL: models.upscaler, textureURL: models.textureUpscaler,
                            useNeuralEngine: useNeuralEngine)
-            up = try upscaler.upscale(input) { p in
+            up = try upscaler.upscale(input, outScale: outScale) { p in
                 progress(0.04 + upShare * p, "Mejorando toda la foto…")
             }
         }
 
-        // 3. Rebuild facial detail, working from the textured photo.
+        // 3. Restore faces from the original and fuse them with the enhanced photo.
         var restored: [RestoredFace] = []
         if !faces.isEmpty {
-            let label = faces.count == 1 ? "Reconstruyendo la cara…" : "Reconstruyendo \(faces.count) caras…"
+            let label = faces.count == 1 ? "Mejorando la cara…" : "Mejorando \(faces.count) caras…"
             progress(faceStart, label)
             let canvas = Upscaler.applyDetail(base: up.base, detail: up.detail, amount: 1)
-            let restorer = FaceRestorer(cleanURL: models.faceRestorer, detailURL: models.faceTexture)
-            restored = try restorer.restore(canvas, faces: faces, landmarkScale: Float(Upscaler.scale)) { p in
+            let restorer = FaceRestorer(modelURL: models.faceRestorer)
+            restored = try restorer.restore(original: input, canvas: canvas, faces: faces, outScale: outScale) { p in
                 progress(faceStart + (0.98 - faceStart) * p, label)
             }
         }

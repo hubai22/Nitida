@@ -1,14 +1,13 @@
 import Foundation
 
-/// Downloads the AI models once (≈730 MB) and keeps them in Application Support.
+/// Downloads the AI models once (≈485 MB) and keeps them in Application Support.
 @MainActor
 final class ModelStore: ObservableObject {
     struct Model {
         let file: String
         let size: Int64
-        var url: URL {
-            URL(string: "https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0/\(file)")!
-        }
+        var base = "https://github.com/facefusion/facefusion-assets/releases/download/models-3.0.0"
+        var url: URL { URL(string: "\(base)/\(file)")! }
     }
 
     struct Paths {
@@ -17,7 +16,6 @@ final class ModelStore: ObservableObject {
         let textureUpscaler: URL
         let fastUpscaler: URL
         let faceRestorer: URL
-        let faceTexture: URL
     }
 
     enum State: Equatable {
@@ -34,11 +32,10 @@ final class ModelStore: ObservableObject {
     nonisolated static let textureUpscaler = Model(file: "nomos8k_sc_x4.onnx", size: 67_002_465)
     // SPAN x4 (Clear Reality): very fast whole-photo model for the Rápida mode.
     nonisolated static let fastUpscaler = Model(file: "clear_reality_x4.onnx", size: 1_718_947)
-    // GFPGAN 1.4: flattering, clean facial features.
-    nonisolated static let faceRestorer = Model(file: "gfpgan_1.4.onnx", size: 340_299_087)
-    // GPEN-BFR-512: only its fine texture (pores, lashes, lip lines) is layered on the face.
-    nonisolated static let faceTexture = Model(file: "gpen_bfr_512.onnx", size: 284_340_240)
-    nonisolated static let all = [detector, fastUpscaler, upscaler, textureUpscaler, faceRestorer, faceTexture]
+    // CodeFormer with fidelity 0.9 built in: restores faces while keeping the person's identity.
+    nonisolated static let faceRestorer = Model(file: "codeformer_w09.onnx", size: 376_951_654,
+                                                base: "https://github.com/hubai22/Nitida/releases/download/models-1")
+    nonisolated static let all = [detector, fastUpscaler, upscaler, textureUpscaler, faceRestorer]
     nonisolated static var totalBytes: Int64 { all.reduce(0) { $0 + $1.size } }
 
     @Published private(set) var state: State = .missing
@@ -74,7 +71,7 @@ final class ModelStore: ObservableObject {
     var paths: Paths {
         Paths(detector: path(Self.detector), upscaler: path(Self.upscaler),
               textureUpscaler: path(Self.textureUpscaler), fastUpscaler: path(Self.fastUpscaler),
-              faceRestorer: path(Self.faceRestorer), faceTexture: path(Self.faceTexture))
+              faceRestorer: path(Self.faceRestorer))
     }
 
     /// Bytes still to download (only missing models are fetched).

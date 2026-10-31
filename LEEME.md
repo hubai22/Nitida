@@ -2,11 +2,11 @@
 
 App nativa para iPhone (iOS 16 o superior) que mejora fotos de baja calidad:
 
-1. **Toda la foto**: Real-ESRGAN limpia artefactos, ruido y desenfoque y la amplía ×4; Nomos8k SC le añade textura real (piel, pelo, ropa, fondo).
-2. **Las caras**: SCRFD localiza cada cara, GFPGAN reconstruye los rasgos (ojos, labios, piel) y GPEN-1024 añade poros, pestañas y líneas finas, sin efecto plástico (no es un filtro de nitidez).
-3. Comparador antes/después, controles de textura e intensidad en caras, guardar en Fotos y compartir.
+1. **Toda la foto**: se mejora y amplía ×2 o ×4 sin reducirla antes (conserva su detalle real). En Máxima calidad, Real-ESRGAN + Nomos8k añaden textura extra.
+2. **Las caras**: SCRFD las localiza y CodeFormer las mejora a partir de la foto original conservando la identidad; el detalle fino viene de la foto mejorada.
+3. Comparador antes/después, zoom (mantén pulsado para ver el original), controles de textura e intensidad en caras, volver para probar otro modo, guardar en Fotos y compartir.
 
-Todo se procesa dentro del iPhone; las fotos no se suben a ningún servidor. La primera vez la app descarga el motor de IA (unos 730 MB, mejor con Wi-Fi).
+Todo se procesa dentro del iPhone; las fotos no se suben a ningún servidor. La primera vez la app descarga el motor de IA (unos 485 MB, mejor con Wi-Fi).
 
 ---
 
@@ -62,4 +62,4 @@ Si alguna foto sale rara o la app se cierra al mejorar, desactiva **Ajustes (⚙
 
 ## Licencias de los modelos
 
-GFPGAN (Apache 2.0), Real-ESRGAN (BSD-3), GPEN (uso no comercial), Nomos8k SC (CC BY-NC-SA), SCRFD/InsightFace (uso no comercial). Esta app es para uso personal.
+CodeFormer (S-Lab License 1.0, uso no comercial), Real-ESRGAN (BSD-3), Nomos8k SC (CC BY-NC-SA), SCRFD/InsightFace (uso no comercial).

@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var showSettings = false
     @State private var toast: String?
+    @State private var showZoom = false
     @AppStorage(EditorModel.qualityKey) private var quality: String = EnhanceQuality.fast.rawValue
 
     private let accent = Color("AccentColor")
@@ -103,6 +104,18 @@ struct ContentView: View {
         case .done:
             if let before = editor.original, let after = editor.enhanced {
                 CompareView(before: before, after: after)
+                    .overlay(alignment: .bottomTrailing) {
+                        Button { showZoom = true } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.headline)
+                                .padding(10)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .padding(10)
+                    }
+                    .fullScreenCover(isPresented: $showZoom) {
+                        ZoomViewer(before: before, after: after)
+                    }
             }
         }
     }
@@ -140,7 +153,7 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
                     Text(quality == EnhanceQuality.max.rawValue
-                         ? "Añade textura real a toda la foto (fondo, pelo, ropa). Tarda más."
+                         ? "Añade textura extra a toda la foto (fondo, pelo, ropa). Tarda más."
                          : "Caras con todo el detalle y textura; el resto de la foto se mejora en segundos.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -200,6 +213,17 @@ struct ContentView: View {
                         .controlSize(.large)
                     }
                 }
+                HStack(spacing: 10) {
+                    Button { editor.backToOptions() } label: {
+                        Label("Probar otro modo", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    Button { showZoom = true } label: {
+                        Label("Zoom", systemImage: "magnifyingglass").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .controlSize(.regular)
             }
         }
     }
@@ -316,15 +340,15 @@ struct SettingsView: View {
                     Text("Usa el chip de IA del iPhone para procesar más rápido. Si alguna foto sale rara o la app se cierra al mejorar, desactívalo.")
                 }
                 Section("Cómo funciona") {
-                    Text("1. Real-ESRGAN limpia y amplía la foto ×4; Nomos8k le añade textura real (piel, pelo, ropa, fondo).")
+                    Text("1. La foto se mejora y amplía (×2 o ×4) sin reducirla antes, para no perder su detalle real. En Máxima calidad se añade textura extra (Real-ESRGAN + Nomos8k).")
                     Text("2. SCRFD localiza las caras.")
-                    Text("3. GFPGAN reconstruye los rasgos de cada cara y GPEN-1024 le añade poros, pestañas y líneas de labios. Ajusta la cantidad con «Textura».")
+                    Text("3. CodeFormer mejora cada cara a partir de la foto original, conservando la identidad; el detalle fino (poros, pestañas) se toma de la foto mejorada.")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
                 Section("Créditos") {
-                    Text("GFPGAN (Tencent ARC), GPEN (Yang et al.), Real-ESRGAN (X. Wang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
+                    Text("CodeFormer (S-Lab, uso no comercial), SPAN Clear Reality, Real-ESRGAN (X. Wang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

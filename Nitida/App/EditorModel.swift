@@ -49,6 +49,14 @@ final class EditorModel: ObservableObject {
         phase = .picked
     }
 
+    /// Back to the options screen with the same photo (e.g. to try the other mode).
+    func backToOptions() {
+        renderTask?.cancel()
+        enhanced = nil
+        result = nil
+        phase = original == nil ? .empty : .picked
+    }
+
     func reset() {
         renderTask?.cancel()
         original = nil
