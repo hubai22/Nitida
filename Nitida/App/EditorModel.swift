@@ -24,6 +24,7 @@ final class EditorModel: ObservableObject {
     @Published var notice: String?
 
     private var result: EnhanceResult?
+    private var runID = 0
     private var renderTask: Task<Void, Never>?
 
     /// Set while a run is in progress; if the app dies mid-run we turn off acceleration next time.
@@ -49,6 +50,15 @@ final class EditorModel: ObservableObject {
         phase = .picked
     }
 
+    /// Stops the current run and goes back to the options screen.
+    func cancel() {
+        guard case .working = phase else { return }
+        Enhancer.requestCancel()
+        runID += 1
+        UIApplication.shared.isIdleTimerDisabled = false
+        phase = original == nil ? .empty : .picked
+    }
+
     /// Back to the options screen with the same photo (e.g. to try the other mode).
     func backToOptions() {
         renderTask?.cancel()
@@ -58,6 +68,7 @@ final class EditorModel: ObservableObject {
     }
 
     func reset() {
+        if case .working = phase { cancel() }
         renderTask?.cancel()
         original = nil
         enhanced = nil
@@ -69,10 +80,13 @@ final class EditorModel: ObservableObject {
         guard let image = original else { return }
         if case .working = phase { return }
         let useNE = UserDefaults.standard.object(forKey: Self.neuralEngineKey) as? Bool ?? true
-        let quality = EnhanceQuality(rawValue: UserDefaults.standard.string(forKey: Self.qualityKey) ?? "") ?? .fast
+        let quality = EnhanceQuality.fast
         let strength = Float(self.strength)
         let texture = Float(self.texture)
         phase = .working(0, "Preparando…")
+        runID += 1
+        let thisRun = runID
+        Enhancer.resetCancel()
         UserDefaults.standard.set(true, forKey: Self.inFlightKey)
         UIApplication.shared.isIdleTimerDisabled = true
         let background = BackgroundRun()
@@ -97,6 +111,7 @@ final class EditorModel: ObservableObject {
             UserDefaults.standard.set(false, forKey: Self.inFlightKey)
             UIApplication.shared.isIdleTimerDisabled = false
             if case .success = outcome { background.finish(success: true) } else { background.finish(success: false) }
+            guard thisRun == runID else { return }   // cancelled: the screen already moved on
             switch outcome {
             case .success(let (r, img)):
                 result = r

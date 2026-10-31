@@ -40,6 +40,7 @@ final class FaceRestorer {
         // Runs on the CPU: this kind of model can overflow the Neural Engine's 16-bit math.
         let runner = try OrtRunner(modelURL: modelURL, useNeuralEngine: false)
         for (index, face) in faces.enumerated() {
+            try Enhancer.checkCancelled()
             try autoreleasepool {
                 let toCrop = Affine.similarity(from: face.landmarks, to: template)   // original -> crop
                 let input = Self.cropInput(original, toCrop: toCrop, size: C)

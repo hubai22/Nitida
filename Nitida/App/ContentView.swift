@@ -8,7 +8,6 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var toast: String?
     @State private var showZoom = false
-    @AppStorage(EditorModel.qualityKey) private var quality: String = EnhanceQuality.fast.rawValue
 
     private let accent = Color("AccentColor")
 
@@ -36,7 +35,6 @@ struct ContentView: View {
                 if editor.original != nil {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button("Nueva") { editor.reset() }
-                            .disabled(isWorking)
                     }
                 }
             }
@@ -97,6 +95,10 @@ struct ContentView: View {
                     Text("\(Int(p * 100)) %  ·  Puedes salir de la app, seguirá trabajando")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    Button(role: .cancel) { editor.cancel() } label: {
+                        Label("Cancelar", systemImage: "xmark")
+                    }
+                    .buttonStyle(.bordered)
                 }
                 .padding(24)
                 .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -145,19 +147,6 @@ struct ContentView: View {
             picker(label: "Elegir foto", prominent: true)
         case .picked:
             VStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Picker("Modo", selection: $quality) {
-                        ForEach(EnhanceQuality.allCases, id: \.rawValue) { q in
-                            Text(q.label).tag(q.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    Text(quality == EnhanceQuality.max.rawValue
-                         ? "Añade textura extra a toda la foto (fondo, pelo, ropa). Tarda más."
-                         : "Caras con todo el detalle y textura; el resto de la foto se mejora en segundos.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
                 Button {
                     editor.enhance(models: models.paths)
                 } label: {
@@ -215,7 +204,7 @@ struct ContentView: View {
                 }
                 HStack(spacing: 10) {
                     Button { editor.backToOptions() } label: {
-                        Label("Probar otro modo", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
+                        Label("Volver", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     Button { showZoom = true } label: {

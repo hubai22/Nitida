@@ -1,6 +1,6 @@
 import Foundation
 
-/// Downloads the AI models once (≈485 MB) and keeps them in Application Support.
+/// Downloads the AI models once (≈380 MB) and keeps them in Application Support.
 @MainActor
 final class ModelStore: ObservableObject {
     struct Model {
@@ -35,7 +35,8 @@ final class ModelStore: ObservableObject {
     // CodeFormer with fidelity 0.9 built in: restores faces while keeping the person's identity.
     nonisolated static let faceRestorer = Model(file: "codeformer_w09.onnx", size: 376_951_654,
                                                 base: "https://github.com/hubai22/Nitida/releases/download/models-1")
-    nonisolated static let all = [detector, fastUpscaler, upscaler, textureUpscaler, faceRestorer]
+    // The heavy x4 models (upscaler, textureUpscaler) were too slow on iPhone CPUs and are no longer used.
+    nonisolated static let all = [detector, fastUpscaler, faceRestorer]
     nonisolated static var totalBytes: Int64 { all.reduce(0) { $0 + $1.size } }
 
     @Published private(set) var state: State = .missing

@@ -27,8 +27,21 @@ enum EnhanceQuality: String, CaseIterable {
 }
 
 enum Enhancer {
+    private static let cancelLock = NSLock()
+    private static var cancelFlag = false
+
+    /// Asks the running enhancement to stop at the next step (thread-safe).
+    static func requestCancel() { cancelLock.lock(); cancelFlag = true; cancelLock.unlock() }
+    static func resetCancel() { cancelLock.lock(); cancelFlag = false; cancelLock.unlock() }
+    /// Throws if a cancel was requested; called between tiles and faces.
+    static func checkCancelled() throws {
+        cancelLock.lock(); let c = cancelFlag; cancelLock.unlock()
+        if c { throw EngineError.cancelled }
+    }
+
     static func run(image: UIImage, models: ModelStore.Paths, quality: EnhanceQuality, useNeuralEngine: Bool,
                     progress: @escaping (Double, String) -> Void) throws -> EnhanceResult {
+        try checkCancelled()
         progress(0, "Preparando la foto…")
         guard let input = RGBAImage.from(image, maxSide: quality.maxInputSide) else { throw EngineError.imageDecode }
         let longSide = max(input.width, input.height)
@@ -43,14 +56,11 @@ enum Enhancer {
         }
 
         // 2. Enhance and enlarge the whole photo.
-        let upShare = faces.isEmpty ? 0.94 : (quality == .fast ? 0.45 : 0.75)
+        let upShare = faces.isEmpty ? 0.94 : 0.45
         let faceStart = 0.04 + upShare
         let up: Upscaler.Output
         do {
-            let upscaler = quality == .fast
-                ? Upscaler(cleanURL: models.fastUpscaler, textureURL: nil, useNeuralEngine: useNeuralEngine)
-                : Upscaler(cleanURL: models.upscaler, textureURL: models.textureUpscaler,
-                           useNeuralEngine: useNeuralEngine)
+            let upscaler = Upscaler(cleanURL: models.fastUpscaler, textureURL: nil, useNeuralEngine: useNeuralEngine)
             up = try upscaler.upscale(input, outScale: outScale) { p in
                 progress(0.04 + upShare * p, "Mejorando toda la foto…")
             }

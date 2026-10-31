@@ -4,11 +4,13 @@ import OnnxRuntimeBindings
 enum EngineError: LocalizedError {
     case badOutput(String)
     case imageDecode
+    case cancelled
 
     var errorDescription: String? {
         switch self {
         case .badOutput(let m): return "El modelo devolvió un resultado inesperado (\(m))."
         case .imageDecode: return "No se pudo leer la foto."
+        case .cancelled: return "Cancelado."
         }
     }
 }

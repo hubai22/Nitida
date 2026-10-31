@@ -123,6 +123,7 @@ final class Upscaler {
             let src = srcBuf.baseAddress!
             for ty in 0..<tilesY {
                 for tx in 0..<tilesX {
+                    try Enhancer.checkCancelled()
                     try autoreleasepool {
                         let x0 = tx * tile, y0 = ty * tile
                         for yy in 0..<S {
