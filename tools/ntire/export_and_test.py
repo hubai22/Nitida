@@ -6,7 +6,7 @@ sys.path.insert(0, 'ntire')
 os.makedirs('out', exist_ok=True)
 
 FOLDER = 'https://drive.google.com/drive/folders/1WvVqMqS8XxAsBRaYpPgHYTYe62agsP01'
-files = gdown.download_folder(FOLDER, skip_download=True, quiet=True, remaining_ok=True)
+files = gdown.download_folder(FOLDER, skip_download=True, quiet=True)
 print('drive files:', len(files))
 for f in files:
     print('  ', f.path)
