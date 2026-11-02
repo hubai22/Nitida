@@ -121,7 +121,6 @@ enum Clarity {
         }
         return out
     }
-    }
 
     /// Adds a luminance layer (times `amount`) to an image.
     static func add(_ layer: [Int8], to img: RGBAImage, amount: Float) -> RGBAImage {

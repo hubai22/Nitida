@@ -37,8 +37,11 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            build | tee build.log | grep -E "error:|warning: unre|BUILD (SUCCEEDED|FAILED)" || true
-          test -d build/Build/Products/Release-iphoneos/Nitida.app
+            build > build.log 2>&1 || true
+          grep -E "error:|BUILD (SUCCEEDED|FAILED)" build.log | sort -u | head -40 || true
+          grep -q "BUILD SUCCEEDED" build.log
+          test -f build/Build/Products/Release-iphoneos/Nitida.app/Nitida
+          test -f build/Build/Products/Release-iphoneos/Nitida.app/Info.plist
 
       - name: Empaquetar .ipa
         run: |
@@ -46,6 +49,7 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/Nitida.app Payload/
           zip -qr Nitida.ipa Payload
           ls -lh Nitida.ipa
+          test $(stat -f%z Nitida.ipa) -gt 1000000
 
       - name: Subir registro si falla
         if: failure()
