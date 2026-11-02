@@ -177,7 +177,6 @@ struct ContentView: View {
         case .done:
             VStack(spacing: 12) {
                 sliderRow("Definición", value: $editor.definition, range: 0...2)
-                sliderRow("Textura de piel", value: $editor.texture, range: 0...2)
                 if editor.facesFound > 0 {
                     sliderRow("Intensidad en caras", value: $editor.strength, range: 0...1)
                 } else {
@@ -334,7 +333,6 @@ struct SettingsView: View {
                     Text("1. La foto completa se limpia y amplía (×2 o ×4) sin reducirla antes.")
                     Text("2. Las caras se mejoran con CodeFormer conservando la identidad; en caras grandes y nítidas actúa poco para no alisar la piel.")
                     Text("3. Se refuerza el detalle de toda la foto (pelo, ropa, fondo, piel) sin halos ni ruido.")
-                    Text("4. Donde la piel está demasiado lisa se añade textura natural de poros (control «Textura de piel»).")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")
                         .foregroundStyle(.secondary)
                 }

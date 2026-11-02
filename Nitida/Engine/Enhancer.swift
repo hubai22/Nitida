@@ -137,9 +137,8 @@ enum Enhancer {
         }
         up = RGBAImage(width: 1, height: 1)   // free memory
 
-        // 5. Natural skin texture where the skin is too smooth.
-        progress(0.9, "Textura de piel…")
-        let skin = try SkinTexture.layer(base, scale: outScale, cancelCheck: checkCancelled)
+        // Synthetic skin texture was removed: it produced a visible artificial pattern.
+        let skin: [Int8] = []
 
         progress(1, "Listo")
         return EnhanceResult(original: image, base: withFaces, definition: definition, faces: deltas,
