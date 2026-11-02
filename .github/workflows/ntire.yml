@@ -10,8 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: git clone -q --depth 1 https://github.com/jiatongli2024/NTIRE2026_Mobile_RealWorld_ImageSR ntire
       - run: |
-          pip install -q torch --index-url https://download.pytorch.org/whl/cpu
-          pip install -q diffusers==0.31.0 requests gdown onnx onnxruntime opencv-python-headless safetensors
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q diffusers==0.31.0 requests gdown onnxscript onnx onnxruntime opencv-python-headless safetensors
       - run: mkdir -p onnx out && python3 tools/ntire/export_and_test.py
       - name: Resultados a la rama ntire-results
         if: always()

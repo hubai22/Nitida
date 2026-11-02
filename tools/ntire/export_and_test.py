@@ -65,7 +65,7 @@ except Exception as e:
 # --- Antman (team06, RRDBNet)
 try:
     from models.team06_Antman.model import RRDBNet
-    w = [p for p in glob.glob('ntire/model_zoo/**/*.pth', recursive=True) if 'team06' in p]
+    w = [p for p in glob.glob('ntire/model_zoo/**/*.pth', recursive=True) if 'team06' in p and p.endswith('ESRGAN.pth')]
     print('antman weights', w)
     net = RRDBNet()
     sd = torch.load(w[0], map_location='cpu', weights_only=False)
@@ -99,7 +99,7 @@ for name, m in models.items():
     try:
         dummy = torch.rand(1, 3, 160, 160)
         torch.onnx.export(m, dummy, f'onnx/{name}_x4_160.onnx', input_names=['input'], output_names=['output'],
-                          opset_version=17, do_constant_folding=True)
+                          opset_version=17, do_constant_folding=True, dynamo=False)
         import onnxruntime as ort
         s = ort.InferenceSession(f'onnx/{name}_x4_160.onnx', providers=['CPUExecutionProvider'])
         r = s.run(None, {'input': dummy.numpy()})[0]
