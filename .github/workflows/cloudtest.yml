@@ -5,6 +5,8 @@ on:
       spaces:
         description: Spaces de Hugging Face a probar
         default: finegrain/finegrain-image-enhancer
+      script:
+        default: run.py
 permissions:
   contents: write
 jobs:
@@ -14,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install -q gradio_client
-      - run: mkdir -p out && python3 tools/cloudtest/run.py ${{ inputs.spaces }}
+      - run: mkdir -p out && python3 tools/cloudtest/${{ inputs.script }} ${{ inputs.spaces }}
       - name: Publicar resultados en la rama cloudtest-results
         if: always()
         run: |
