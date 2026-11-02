@@ -3,6 +3,7 @@ name: Compilar app para iPhone
 on:
   push:
     branches: [main]
+    paths-ignore: ['tools/**', '.github/workflows/cloudtest.yml', '.github/workflows/models.yml']
   workflow_dispatch:
 
 permissions:

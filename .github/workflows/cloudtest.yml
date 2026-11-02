@@ -1,0 +1,20 @@
+name: Prueba modelos en la nube (gratis)
+on:
+  workflow_dispatch:
+    inputs:
+      spaces:
+        description: Spaces de Hugging Face a probar
+        default: finegrain/finegrain-image-enhancer
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q gradio_client
+      - run: mkdir -p out && python3 tools/cloudtest/run.py ${{ inputs.spaces }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: resultados
+          path: out/
