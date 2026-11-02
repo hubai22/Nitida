@@ -5,17 +5,35 @@ import numpy as np, cv2, torch, gdown
 sys.path.insert(0, 'ntire')
 os.makedirs('out', exist_ok=True)
 
-FOLDER = 'https://drive.google.com/drive/folders/1WvVqMqS8XxAsBRaYpPgHYTYe62agsP01'
-files = gdown.download_folder(FOLDER, skip_download=True, quiet=True)
-print('drive files:', len(files))
-for f in files:
-    print('  ', f.path)
-want = [f for f in files if ('team11' in f.path or 'team06' in f.path)]
-for f in want:
-    dst = os.path.join('ntire', 'model_zoo', f.path)
+FOLDER_ID = '1WvVqMqS8XxAsBRaYpPgHYTYe62agsP01'
+import re, requests, html
+def list_folder(fid, prefix=''):
+    """Lists a public Drive folder (embedded view), recursing only into the folders we need."""
+    r = requests.get(f'https://drive.google.com/embeddedfolderview?id={fid}', timeout=60)
+    if r.status_code != 200:
+        print('skip folder', prefix, r.status_code); return []
+    out = []
+    for m in re.finditer(r'<a href="(https://drive\.google\.com/[^"]+)"[^>]*>.*?<div class="flip-entry-title">([^<]+)</div>', r.text, re.S):
+        url, name = html.unescape(m.group(1)), html.unescape(m.group(2)).strip()
+        path = f'{prefix}/{name}' if prefix else name
+        fm = re.search(r'/folders/([\w-]+)', url)
+        if fm:
+            if prefix or 'team11' in name or 'team06' in name:
+                out += list_folder(fm.group(1), path)
+            else:
+                print('  (folder)', path)
+        else:
+            im = re.search(r'/file/d/([\w-]+)', url)
+            if im: out.append((im.group(1), path))
+    return out
+want = list_folder(FOLDER_ID)
+print('drive files:', len(want))
+for fid, path in want:
+    print('  file', path)
+    dst = os.path.join('ntire', 'model_zoo', path)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    gdown.download(id=f.id, output=dst, quiet=True)
-    print('got', dst, os.path.getsize(dst))
+    gdown.download(id=fid, output=dst, quiet=True)
+    print('got', dst, os.path.getsize(dst) if os.path.exists(dst) else 'MISSING')
 
 SD21_UNET = {"_class_name":"UNet2DConditionModel","act_fn":"silu","attention_head_dim":[5,10,20,20],
  "block_out_channels":[320,640,1280,1280],"center_input_sample":False,"cross_attention_dim":1024,
