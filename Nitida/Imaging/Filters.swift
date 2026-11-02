@@ -66,8 +66,8 @@ enum Filters {
 enum Clarity {
     static let gains: (fine: Float, mid: Float, coarse: Float) = (3.0, 1.5, 1.2)
 
-    static func apply(_ img: RGBAImage, scale: Int, cancelCheck: () throws -> Void = {}) rethrows -> RGBAImage {
-        var out = img
+    static func layer(_ img: RGBAImage, scale: Int, cancelCheck: () throws -> Void = {}) rethrows -> [Int8] {
+        var out = [Int8](repeating: 0, count: img.width * img.height)
         let W = img.width, H = img.height, s = Float(scale)
         let r = 8 * scale
         let margin = 18 * scale + 8
@@ -102,7 +102,7 @@ enum Clarity {
             let act = Filters.gauss(absMid, W, rows, 2 * s)
 
             let g = gains
-            out.pixels.withUnsafeMutableBufferPointer { o in
+            out.withUnsafeMutableBufferPointer { o in
                 for y in own0..<(own0 + ownRows) {
                     for x in 0..<W {
                         let i = y * W + x
@@ -114,15 +114,32 @@ enum Clarity {
                                    + 0.10 * tanhf(mid * g.mid / 0.10)
                                    + 0.08 * tanhf(fine * gf / 0.08)
                         let d = (v - L[i]) * 255
-                        let j = (a * W + i) * 4
-                        o[j] = toByte(Float(o[j]) + d)
-                        o[j + 1] = toByte(Float(o[j + 1]) + d)
-                        o[j + 2] = toByte(Float(o[j + 2]) + d)
+                        o[a * W + i] = Int8(min(max(d.rounded(), -127), 127))
                     }
                 }
             }
         }
         return out
+    }
+    }
+
+    /// Adds a luminance layer (times `amount`) to an image.
+    static func add(_ layer: [Int8], to img: RGBAImage, amount: Float) -> RGBAImage {
+        var out = img
+        guard amount != 0, layer.count == img.width * img.height else { return out }
+        out.pixels.withUnsafeMutableBufferPointer { o in
+            for i in 0..<layer.count where layer[i] != 0 {
+                let d = amount * Float(layer[i]), j = i * 4
+                o[j] = toByte(Float(o[j]) + d)
+                o[j + 1] = toByte(Float(o[j + 1]) + d)
+                o[j + 2] = toByte(Float(o[j + 2]) + d)
+            }
+        }
+        return out
+    }
+
+    static func apply(_ img: RGBAImage, scale: Int, cancelCheck: () throws -> Void = {}) rethrows -> RGBAImage {
+        add(try layer(img, scale: scale, cancelCheck: cancelCheck), to: img, amount: 1)
     }
 }
 

@@ -21,6 +21,9 @@ final class EditorModel: ObservableObject {
     @Published var texture: Double = 1.0 {
         didSet { if oldValue != texture { rerender() } }
     }
+    @Published var definition: Double = 1.0 {
+        didSet { if oldValue != definition { rerender() } }
+    }
     @Published var notice: String?
 
     private var result: EnhanceResult?
@@ -83,6 +86,7 @@ final class EditorModel: ObservableObject {
         let quality = EnhanceQuality.fast
         let strength = Float(self.strength)
         let texture = Float(self.texture)
+        let definition = Float(self.definition)
         phase = .working(0, "Preparando…")
         runID += 1
         let thisRun = runID
@@ -102,7 +106,7 @@ final class EditorModel: ObservableObject {
                             self.phase = .working(p, label)
                         }
                     }
-                    return .success((r, r.render(strength: strength, texture: texture)))
+                    return .success((r, r.render(strength: strength, texture: texture, definition: definition)))
                 } catch {
                     return .failure(error)
                 }
@@ -128,11 +132,12 @@ final class EditorModel: ObservableObject {
         guard let r = result else { return }
         let s = Float(strength)
         let t = Float(texture)
+        let d = Float(definition)
         renderTask?.cancel()
         renderTask = Task {
             try? await Task.sleep(nanoseconds: 60_000_000)
             if Task.isCancelled { return }
-            let img = await Task.detached(priority: .userInitiated) { r.render(strength: s, texture: t) }.value
+            let img = await Task.detached(priority: .userInitiated) { r.render(strength: s, texture: t, definition: d) }.value
             if !Task.isCancelled, let img { enhanced = img }
         }
     }

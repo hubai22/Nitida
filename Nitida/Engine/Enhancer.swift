@@ -9,13 +9,14 @@ struct FaceDelta {
 /// Output of a run: the finished photo plus two adjustable layers, so the sliders are instant.
 struct EnhanceResult {
     let original: UIImage
-    let base: RGBAImage        // fully enhanced, faces at 100 %, without synthesized skin texture
+    let base: RGBAImage        // cleaned/enlarged photo with faces at 100 %, before definition
+    let definition: [Int8]     // luminance layer of the detail boost (at 100 %)
     let faces: [FaceDelta]
     let skin: [Int8]           // luminance offset of the synthesized skin texture (at 100 %)
     let facesFound: Int
 
-    func render(strength: Float, texture: Float) -> UIImage? {
-        var out = base
+    func render(strength: Float, texture: Float, definition amount: Float) -> UIImage? {
+        var out = Clarity.add(definition, to: base, amount: amount)
         let W = out.width
         out.pixels.withUnsafeMutableBufferPointer { o in
             if strength != 1 {
@@ -108,7 +109,8 @@ enum Enhancer {
 
         // 4. Detail and definition for the whole photo (hair, fabric, background, skin).
         progress(0.76, "Dando definición…")
-        let base = try Clarity.apply(withFaces, scale: outScale, cancelCheck: checkCancelled)
+        let definition = try Clarity.layer(withFaces, scale: outScale, cancelCheck: checkCancelled)
+        let base = Clarity.add(definition, to: withFaces, amount: 1)
 
         // Face layers for the intensity slider: clarity of the photo without the face fix, per face.
         var deltas: [FaceDelta] = []
@@ -140,6 +142,7 @@ enum Enhancer {
         let skin = try SkinTexture.layer(base, scale: outScale, cancelCheck: checkCancelled)
 
         progress(1, "Listo")
-        return EnhanceResult(original: image, base: base, faces: deltas, skin: skin, facesFound: faces.count)
+        return EnhanceResult(original: image, base: withFaces, definition: definition, faces: deltas,
+                             skin: skin, facesFound: faces.count)
     }
 }

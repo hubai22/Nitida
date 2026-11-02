@@ -176,7 +176,8 @@ struct ContentView: View {
             }
         case .done:
             VStack(spacing: 12) {
-                sliderRow("Textura de piel", value: $editor.texture, range: 0...1.5)
+                sliderRow("Definición", value: $editor.definition, range: 0...2)
+                sliderRow("Textura de piel", value: $editor.texture, range: 0...2)
                 if editor.facesFound > 0 {
                     sliderRow("Intensidad en caras", value: $editor.strength, range: 0...1)
                 } else {
