@@ -1,29 +1,59 @@
 import UIKit
 
-/// Output of a run. Detail layers and faces are kept separately so the sliders re-blend instantly.
+/// Difference that the face restoration makes inside one face's rectangle (after clarity).
+struct FaceDelta {
+    let x0: Int, y0: Int, width: Int, height: Int
+    let delta: [Int16]   // interleaved RGB
+}
+
+/// Output of a run: the finished photo plus two adjustable layers, so the sliders are instant.
 struct EnhanceResult {
     let original: UIImage
-    let base: RGBAImage
-    let detail: [Int8]
-    let faces: [RestoredFace]
+    let base: RGBAImage        // fully enhanced, faces at 100 %, without synthesized skin texture
+    let faces: [FaceDelta]
+    let skin: [Int8]           // luminance offset of the synthesized skin texture (at 100 %)
     let facesFound: Int
 
     func render(strength: Float, texture: Float) -> UIImage? {
-        let textured = Upscaler.applyDetail(base: base, detail: detail, amount: texture)
-        return FaceRestorer.composite(base: textured, faces: faces, strength: strength, texture: texture).uiImage()
+        var out = base
+        let W = out.width
+        out.pixels.withUnsafeMutableBufferPointer { o in
+            if strength != 1 {
+                let k = strength - 1
+                for f in faces {
+                    for y in 0..<f.height {
+                        for x in 0..<f.width {
+                            let i = (y * f.width + x) * 3
+                            let j = ((f.y0 + y) * W + f.x0 + x) * 4
+                            o[j] = toByte(Float(o[j]) + k * Float(f.delta[i]))
+                            o[j + 1] = toByte(Float(o[j + 1]) + k * Float(f.delta[i + 1]))
+                            o[j + 2] = toByte(Float(o[j + 2]) + k * Float(f.delta[i + 2]))
+                        }
+                    }
+                }
+            }
+            if texture != 0, skin.count == base.width * base.height {
+                for i in 0..<skin.count where skin[i] != 0 {
+                    let d = texture * Float(skin[i])
+                    let j = i * 4
+                    o[j] = toByte(Float(o[j]) + d)
+                    o[j + 1] = toByte(Float(o[j + 1]) + d)
+                    o[j + 2] = toByte(Float(o[j + 2]) + d)
+                }
+            }
+        }
+        return out.uiImage()
     }
 }
 
 enum EnhanceQuality: String, CaseIterable {
-    /// Light, very fast model for the whole photo; faces get the same full restoration.
     case fast
-    /// Heavier models with a texture layer on the whole photo; takes longer.
     case max
 
     var label: String { self == .fast ? "Rápida" : "Máxima calidad" }
     /// Largest side the photo is processed at. The photo is never shrunk below this, so its real
     /// detail is kept; output is 4x (small photos) or 2x (larger ones), at most ~4096 px.
-    var maxInputSide: Int { self == .fast ? 2048 : 1280 }
+    var maxInputSide: Int { 2048 }
 }
 
 enum Enhancer {
@@ -33,7 +63,7 @@ enum Enhancer {
     /// Asks the running enhancement to stop at the next step (thread-safe).
     static func requestCancel() { cancelLock.lock(); cancelFlag = true; cancelLock.unlock() }
     static func resetCancel() { cancelLock.lock(); cancelFlag = false; cancelLock.unlock() }
-    /// Throws if a cancel was requested; called between tiles and faces.
+    /// Throws if a cancel was requested; called between tiles, strips and faces.
     static func checkCancelled() throws {
         cancelLock.lock(); let c = cancelFlag; cancelLock.unlock()
         if c { throw EngineError.cancelled }
@@ -55,29 +85,61 @@ enum Enhancer {
             faces = try detector.detect(input)
         }
 
-        // 2. Enhance and enlarge the whole photo.
-        let upShare = faces.isEmpty ? 0.94 : 0.45
-        let faceStart = 0.04 + upShare
-        let up: Upscaler.Output
+        // 2. Clean up and enlarge the whole photo.
+        var up: RGBAImage
         do {
             let upscaler = Upscaler(cleanURL: models.fastUpscaler, textureURL: nil, useNeuralEngine: useNeuralEngine)
             up = try upscaler.upscale(input, outScale: outScale) { p in
-                progress(0.04 + upShare * p, "Mejorando toda la foto…")
-            }
+                progress(0.04 + 0.5 * p, "Mejorando toda la foto…")
+            }.base
         }
 
-        // 3. Restore faces from the original and fuse them with the enhanced photo.
+        // 3. Faces: restored from the original, keeping the person's identity and real skin.
         var restored: [RestoredFace] = []
         if !faces.isEmpty {
             let label = faces.count == 1 ? "Mejorando la cara…" : "Mejorando \(faces.count) caras…"
-            progress(faceStart, label)
-            let canvas = Upscaler.applyDetail(base: up.base, detail: up.detail, amount: 1)
+            progress(0.55, label)
             let restorer = FaceRestorer(modelURL: models.faceRestorer)
-            restored = try restorer.restore(original: input, canvas: canvas, faces: faces, outScale: outScale) { p in
-                progress(faceStart + (0.98 - faceStart) * p, label)
+            restored = try restorer.restore(original: input, canvas: up, faces: faces, outScale: outScale) { p in
+                progress(0.55 + 0.2 * p, label)
             }
         }
+        let withFaces = FaceRestorer.composite(base: up, faces: restored, strength: 1, texture: 1)
+
+        // 4. Detail and definition for the whole photo (hair, fabric, background, skin).
+        progress(0.76, "Dando definición…")
+        let base = try Clarity.apply(withFaces, scale: outScale, cancelCheck: checkCancelled)
+
+        // Face layers for the intensity slider: clarity of the photo without the face fix, per face.
+        var deltas: [FaceDelta] = []
+        let margin = 18 * outScale + 8
+        for f in restored {
+            try checkCancelled()
+            let x0 = max(0, f.x0 - margin), y0 = max(0, f.y0 - margin)
+            let x1 = min(up.width, f.x0 + f.width + margin), y1 = min(up.height, f.y0 + f.height + margin)
+            let plain = Clarity.apply(up.cropped(x: x0, y: y0, width: x1 - x0, height: y1 - y0), scale: outScale)
+            var d = [Int16](repeating: 0, count: f.width * f.height * 3)
+            base.pixels.withUnsafeBufferPointer { b in
+                plain.pixels.withUnsafeBufferPointer { p in
+                    for y in 0..<f.height {
+                        for x in 0..<f.width {
+                            let bi = ((f.y0 + y) * base.width + f.x0 + x) * 4
+                            let pi = ((f.y0 - y0 + y) * plain.width + (f.x0 - x0 + x)) * 4
+                            let di = (y * f.width + x) * 3
+                            for c in 0..<3 { d[di + c] = Int16(b[bi + c]) - Int16(p[pi + c]) }
+                        }
+                    }
+                }
+            }
+            deltas.append(FaceDelta(x0: f.x0, y0: f.y0, width: f.width, height: f.height, delta: d))
+        }
+        up = RGBAImage(width: 1, height: 1)   // free memory
+
+        // 5. Natural skin texture where the skin is too smooth.
+        progress(0.9, "Textura de piel…")
+        let skin = try SkinTexture.layer(base, scale: outScale, cancelCheck: checkCancelled)
+
         progress(1, "Listo")
-        return EnhanceResult(original: image, base: up.base, detail: up.detail, faces: restored, facesFound: faces.count)
+        return EnhanceResult(original: image, base: base, faces: deltas, skin: skin, facesFound: faces.count)
     }
 }

@@ -61,7 +61,11 @@ final class FaceRestorer {
                 let s = Float(outScale)
                 let outToCrop = Affine(a: toCrop.a / s, b: toCrop.b / s, c: toCrop.c / s, d: toCrop.d / s,
                                        tx: toCrop.tx, ty: toCrop.ty)
-                if let r = Self.fuse(restored: restored, outToCrop: outToCrop, canvas: canvas) {
+                // Original pixels per crop pixel. Big, detailed faces (>= 1.3) need little help from the
+                // model (it would only smooth real skin); small blurry faces get its full effect.
+                let facePx = 1 / sqrt(abs(toCrop.a * toCrop.d - toCrop.b * toCrop.c))
+                let amount = min(max((1.3 - facePx) / 0.7, 0.25), 1.0) * 0.5
+                if let r = Self.fuse(restored: restored, outToCrop: outToCrop, canvas: canvas, amount: amount) {
                     results.append(r)
                 }
             }
@@ -116,7 +120,7 @@ final class FaceRestorer {
 
     /// Maps the restored crop into the output and splits it into low (restored structure) and
     /// high (photo detail) bands at the crop's own resolution limit.
-    private static func fuse(restored: [UInt8], outToCrop: Affine, canvas: RGBAImage) -> RestoredFace? {
+    private static func fuse(restored: [UInt8], outToCrop: Affine, canvas: RGBAImage, amount: Float) -> RestoredFace? {
         let C = cropSize
         let W = canvas.width, H = canvas.height
         let toOut = outToCrop.inverted()
@@ -130,7 +134,8 @@ final class FaceRestorer {
 
         // Output pixels per crop pixel: how much the restored face gets stretched.
         let stretch = 1 / sqrt(abs(outToCrop.a * outToCrop.d - outToCrop.b * outToCrop.c))
-        let sigma = 0.6 * stretch
+        // The model only supplies structure above this scale; finer detail is the photo's own.
+        let sigma = max(0.8, 0.8 * stretch)
 
         var rest = [Float](repeating: 0, count: 3 * n)   // planar
         var photo = [Float](repeating: 0, count: 3 * n)  // planar
@@ -146,7 +151,7 @@ final class FaceRestorer {
                         photo[i] = Float(cp[ci]); photo[n + i] = Float(cp[ci + 1]); photo[2 * n + i] = Float(cp[ci + 2])
                         let (u, v) = outToCrop.apply(Float(x0 + x), Float(y0 + y))
                         if u >= 0, v >= 0, u <= Float(C - 1), v <= Float(C - 1) {
-                            mask[i] = toByte(ovalMask(u, v) * 255)
+                            mask[i] = toByte(ovalMask(u, v) * amount * 255)
                             sampleBilinear(rp, width: C, height: C, channels: 3, x: u, y: v, out: &rgb)
                             rest[i] = rgb.0; rest[n + i] = rgb.1; rest[2 * n + i] = rgb.2
                         } else {

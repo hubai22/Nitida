@@ -26,7 +26,8 @@ struct ContentView: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
-            .background(Color(red: 0.06, green: 0.05, blue: 0.10).ignoresSafeArea())
+            .background(LinearGradient(colors: [Color(red: 0.03, green: 0.07, blue: 0.17), Color(red: 0.01, green: 0.03, blue: 0.09)],
+                                       startPoint: .top, endPoint: .bottom).ignoresSafeArea())
             .navigationTitle("Nítida")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -175,7 +176,7 @@ struct ContentView: View {
             }
         case .done:
             VStack(spacing: 12) {
-                sliderRow("Textura", value: $editor.texture, range: 0...1.5)
+                sliderRow("Textura de piel", value: $editor.texture, range: 0...1.5)
                 if editor.facesFound > 0 {
                     sliderRow("Intensidad en caras", value: $editor.strength, range: 0...1)
                 } else {
@@ -245,13 +246,13 @@ struct ContentView: View {
 
     private func noticeBanner(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+            Image(systemName: "info.circle.fill").foregroundStyle(accent)
             Text(text).font(.footnote)
             Spacer(minLength: 0)
             Button { editor.notice = nil } label: { Image(systemName: "xmark").font(.footnote) }
         }
         .padding(12)
-        .background(Color.yellow.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .background(accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Toast
@@ -329,15 +330,16 @@ struct SettingsView: View {
                     Text("Usa el chip de IA del iPhone para procesar más rápido. Si alguna foto sale rara o la app se cierra al mejorar, desactívalo.")
                 }
                 Section("Cómo funciona") {
-                    Text("1. La foto se mejora y amplía (×2 o ×4) sin reducirla antes, para no perder su detalle real. En Máxima calidad se añade textura extra (Real-ESRGAN + Nomos8k).")
-                    Text("2. SCRFD localiza las caras.")
-                    Text("3. CodeFormer mejora cada cara a partir de la foto original, conservando la identidad; el detalle fino (poros, pestañas) se toma de la foto mejorada.")
+                    Text("1. La foto completa se limpia y amplía (×2 o ×4) sin reducirla antes.")
+                    Text("2. Las caras se mejoran con CodeFormer conservando la identidad; en caras grandes y nítidas actúa poco para no alisar la piel.")
+                    Text("3. Se refuerza el detalle de toda la foto (pelo, ropa, fondo, piel) sin halos ni ruido.")
+                    Text("4. Donde la piel está demasiado lisa se añade textura natural de poros (control «Textura de piel»).")
                     Text("Todo ocurre en el iPhone; tus fotos no salen del teléfono.")
                         .foregroundStyle(.secondary)
                 }
                 .font(.footnote)
                 Section("Créditos") {
-                    Text("CodeFormer (S-Lab, uso no comercial), SPAN Clear Reality, Real-ESRGAN (X. Wang et al.), Nomos8k SC (Helaman), SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
+                    Text("CodeFormer (S-Lab, uso no comercial), SPAN Clear Reality, SCRFD (InsightFace), ONNX Runtime (Microsoft). Modelos de facefusion-assets.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
