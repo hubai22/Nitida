@@ -119,7 +119,7 @@ enum Enhancer {
             try checkCancelled()
             let x0 = max(0, f.x0 - margin), y0 = max(0, f.y0 - margin)
             let x1 = min(up.width, f.x0 + f.width + margin), y1 = min(up.height, f.y0 + f.height + margin)
-            let plain = Clarity.apply(up.cropped(x: x0, y: y0, width: x1 - x0, height: y1 - y0), scale: outScale)
+            let plain = try Clarity.apply(up.cropped(x: x0, y: y0, width: x1 - x0, height: y1 - y0), scale: outScale)
             var d = [Int16](repeating: 0, count: f.width * f.height * 3)
             base.pixels.withUnsafeBufferPointer { b in
                 plain.pixels.withUnsafeBufferPointer { p in
