@@ -138,7 +138,8 @@ enum Clarity {
     }
 
     static func apply(_ img: RGBAImage, scale: Int, cancelCheck: () throws -> Void = {}) rethrows -> RGBAImage {
-        add(try layer(img, scale: scale, cancelCheck: cancelCheck), to: img, amount: 1)
+        let l = try layer(img, scale: scale, cancelCheck: cancelCheck)
+        return add(l, to: img, amount: 1)
     }
 }
 
